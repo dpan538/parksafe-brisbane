@@ -24,6 +24,12 @@ import {
 } from "./data.js";
 import { fetchRiskSummary } from "./llm.js";
 
+// Use Vercel-style relative API first. In plain local static mode, fallback to Flask.
+const LOG_ENDPOINTS = ["/api/log"];
+if (typeof window !== "undefined" && window.location.protocol === "http:") {
+    LOG_ENDPOINTS.push("http://127.0.0.1:5000/api/log");
+}
+
 // Boot
 const map = initMap();
 
@@ -220,14 +226,18 @@ document.getElementById("analyse-btn").addEventListener("click", async () => {
         const altRisk = calcRouteRisk(altSuburbs);
 
         const altEl = document.getElementById("stat-alts");
-        altEl.textContent = altRisk.label;
-        altEl.className =
-            "stat-cell__value stat-cell__value--" +
-            (altRisk.rank === "high"
-                ? "danger"
-                : altRisk.rank === "medium"
-                  ? "warn"
-                  : "safe");
+        altEl.title = `Main route: ${risk.score}/100 | Alternative: ${altRisk.score}/100`;
+        // Show relative comparison so this card is easier to interpret.
+        if (altRisk.score < risk.score) {
+            altEl.textContent = "Safer";
+            altEl.className = "stat-cell__value stat-cell__value--safe";
+        } else if (altRisk.score > risk.score) {
+            altEl.textContent = "Riskier";
+            altEl.className = "stat-cell__value stat-cell__value--danger";
+        } else {
+            altEl.textContent = "Similar";
+            altEl.className = "stat-cell__value stat-cell__value--muted";
+        }
     }
 
     // 9. Stream AI summary
@@ -236,17 +246,13 @@ document.getElementById("analyse-btn").addEventListener("click", async () => {
     await fetchRiskSummary(origin.suburb, dest.suburb, suburbs, summaryEl);
 
     // 10. Usage log (non-blocking)
-    fetch("/api/log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            origin: originVal,
-            destination: destVal,
-            risk_score: risk.score,
-            risk_rank: risk.rank,
-            suburb_count: suburbs.length,
-            parking_found: parking === null ? 0 : parking.length,
-        }),
+    postUsageLog({
+        origin: originVal,
+        destination: destVal,
+        risk_score: risk.score,
+        risk_rank: risk.rank,
+        suburb_count: suburbs.length,
+        parking_found: parking === null ? 0 : parking.length,
     }).catch(() => {});
 
     hideStatus();
@@ -278,6 +284,26 @@ function setLoading(on) {
     document.getElementById("analyse-btn").disabled = on;
 }
 
+// Try each configured log endpoint until one accepts the POST.
+async function postUsageLog(payload) {
+    let lastErr = null;
+    for (const endpoint of LOG_ENDPOINTS) {
+        try {
+            const res = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            // Skip local static 404 and try Flask fallback.
+            if (res.status === 404 && endpoint.startsWith("/api/")) continue;
+            return;
+        } catch (err) {
+            lastErr = err;
+        }
+    }
+    if (lastErr) throw lastErr;
+}
+
 function resetUI() {
     document.getElementById("stat-risk").textContent = "—";
     document.getElementById("stat-risk").className =
@@ -291,6 +317,7 @@ function resetUI() {
     document.getElementById("stat-alts").textContent = "—";
     document.getElementById("stat-alts").className =
         "stat-cell__value stat-cell__value--muted";
+    document.getElementById("stat-alts").removeAttribute("title");
     document.getElementById("zone-list").innerHTML =
         '<p class="panel__placeholder">Analysing…</p>';
     document.getElementById("risk-index-panel").innerHTML =

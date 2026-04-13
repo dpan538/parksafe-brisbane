@@ -15,6 +15,7 @@ class handler(BaseHTTPRequestHandler):
         return
 
     def do_OPTIONS(self):
+        # Enable CORS for browser clients.
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -32,6 +33,7 @@ class handler(BaseHTTPRequestHandler):
             self._json(500, {"error": str(e)})
 
     def do_POST(self):
+        # Accept partial payloads and fill missing fields with defaults.
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length) if length else b"{}"
         try:
@@ -53,6 +55,7 @@ class handler(BaseHTTPRequestHandler):
         }
 
         try:
+            # /tmp is writable on Vercel but ephemeral across cold starts.
             entries = _read_entries()
             entries.append(entry)
             with open(LOG_PATH, "w", encoding="utf-8") as f:

@@ -1,6 +1,10 @@
-// llm.js — builds prompt and reads Gemini response from /api/summarise (Vercel or vercel dev)
-
-const BACKEND = '/api/summarise';
+// llm.js — builds prompt and reads Gemini summary via server endpoint.
+// Primary path is /api/summarise (Vercel production or `vercel dev`).
+// For simple local static serving (python http.server), we fall back to Flask on :5000.
+const SUMMARISE_ENDPOINTS = ['/api/summarise'];
+if (typeof window !== 'undefined' && window.location.protocol === 'http:') {
+  SUMMARISE_ENDPOINTS.push('http://127.0.0.1:5000/api/summarise');
+}
 
 const QUOTA_HINT =
   'Risk summary unavailable: Gemini API quota or rate limit exceeded. ' +
@@ -126,19 +130,37 @@ export async function fetchRiskSummary(origin, dest, zones, targetEl) {
   targetEl.textContent = 'Generating risk summary…';
 
   try {
-    console.log('[llm] POST summarise', BACKEND, {
-      promptLength: prompt.length,
-      promptPreview: prompt.slice(0, 120) + (prompt.length > 120 ? '…' : ''),
-    });
-
-    const res = await fetch(BACKEND, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
-    });
+    // Try serverless endpoint first, then local Flask fallback in http dev.
+    let res = null;
+    let lastErr = null;
+    let usedEndpoint = '';
+    for (const endpoint of SUMMARISE_ENDPOINTS) {
+      try {
+        console.log('[llm] POST summarise', endpoint, {
+          promptLength: prompt.length,
+          promptPreview: prompt.slice(0, 120) + (prompt.length > 120 ? '…' : ''),
+        });
+        const candidate = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt }),
+        });
+        // Typical local static server returns 404 for /api/*; try fallback next.
+        if (candidate.status === 404 && endpoint.startsWith('/api/')) {
+          continue;
+        }
+        res = candidate;
+        usedEndpoint = endpoint;
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (!res) throw lastErr || new Error('No summary endpoint available');
 
     console.log(
       '[llm] Summarise response:',
+      usedEndpoint,
       res.status,
       res.statusText,
       'ok=',
@@ -194,7 +216,7 @@ export async function fetchRiskSummary(origin, dest, zones, targetEl) {
       msg.includes('Load failed')
     ) {
       targetEl.textContent =
-        'Summary API not available — run `vercel dev` from the project root or use your deployed URL.';
+        'Summary API not available. Start `vercel dev`, or run Flask backend on port 5000 for local static mode.';
     } else if (isQuotaOrRateLimit(msg)) {
       targetEl.textContent = QUOTA_HINT;
     } else {

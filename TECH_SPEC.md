@@ -1,221 +1,165 @@
 # ParkSafe Brisbane — Technical Specification
-> DECO7180 · Team Fourward · Author: Dai Pan
+> DECO7180 · Design Computing Studio 2 · University of Queensland · Team Fourward
 
 ---
 
 ## 1. Project overview
 
-ParkSafe is a browser-based dashboard that helps Brisbane vehicle owners assess theft risk along a planned route. The user inputs an origin and destination postcode; the app geocodes both, draws the route on an interactive map, overlays crime hotspot zones fetched from Queensland Police Service open data, identifies parking areas along the corridor via OpenStreetMap, and generates a plain-language risk summary via a language model API.
+ParkSafe Brisbane is a browser-based dashboard for private vehicle owners to understand theft risk along a planned route. Users enter origin and destination postcodes (or use the destination search bar), and the app renders driving directions, risk zones, nearby parking markers, and a short AI-generated narrative summary.
 
-**Design language:** Editorial warmth — warm paper tones, serif headings, ink-dark rules, no drop shadows. Optimised for a 13-inch MacBook display (1440 × 900 logical pixels).
-
----
-
-## 2. Tech stack
-
-| Layer | Choice | Reason |
-|---|---|---|
-| Structure | Vanilla HTML5 | No build step, fully auditable |
-| Styling | Vanilla CSS (modular files) | Direct control, no framework overhead |
-| Map | Leaflet.js 1.9 via CDN | Free, lightweight, OSM compatible |
-| Geocoding | Nominatim (OSM) | Free, no API key required |
-| Parking data | Overpass API (OSM) | Free, queries amenity=parking by bbox |
-| Crime data | QLD open data CSV (cached JSON) | data.qld.gov.au, refreshed weekly |
-| LLM | Anthropic Claude API (via backend proxy) | Risk narrative generation |
-| Backend | Python + Flask (minimal) | Proxy for API key safety + CSV scraper |
-| Hosting (dev) | Python http.server or VS Code Live Server | Zero config |
-
-No npm. No build tools. No React. All JS is ES modules loaded via script type="module".
+The system is intentionally lightweight: no frontend framework, no bundler, and API calls directly from ES modules.
 
 ---
 
-## 3. File structure
+## 2. Current architecture
 
-```
+### Frontend
+- Static files served from project root (`index.html`, `css/`, `js/`).
+- Runs in browser with Leaflet map and OpenStreetMap tiles.
+- Core orchestration lives in `js/main.js`.
+
+### Data + external APIs
+- **Routing:** OSRM public API (`https://router.project-osrm.org`).
+- **Geocoding:** Nominatim (OpenStreetMap).
+- **Parking:** Overpass API mirrors (`amenity=parking` query by route bounds).
+- **Crime risk:** suburb-level data in `js/data.js` (hardcoded demo set).
+
+### Summary + logging backends
+- **Production:** Vercel serverless handlers in `api/summarise.py` and `api/log.py`.
+- **Local dev:** Flask server in `backend/app.py`.
+- Frontend tries `/api/*` first and falls back to local Flask (`127.0.0.1:5000`) in plain `http` static mode.
+
+---
+
+## 3. Repository structure
+
+```text
 parksafe/
-├── index.html              # Single page entry point
-├── css/
-│   ├── tokens.css          # Design tokens (colours, type, spacing)
-│   ├── reset.css           # Minimal CSS reset
-│   ├── base.css            # Body, typography, global elements
-│   ├── layout.css          # Dashboard grid (topbar / sidebar / main)
-│   ├── sidebar.css         # Route planner + stat cells
-│   ├── map.css             # Map container, legend, controls
-│   └── panels.css          # Bottom panels (summary, zones, risk index)
-├── js/
-│   ├── main.js             # App init, event wiring
-│   ├── map.js              # Leaflet init, route drawing, marker management
-│   ├── api.js              # Nominatim geocoding + Overpass parking query
-│   ├── data.js             # Crime data loader + postcode lookup
-│   ├── llm.js              # LLM prompt builder + fetch to backend proxy
-│   └── router.js           # URL state (postcode in query string)
-├── data/
-│   ├── postcodes.json      # Brisbane postcode → suburb name + centroid
-│   └── crime-cache.json    # Pre-processed QPS crime data by suburb
-├── assets/
-│   └── icons/              # Inline SVG icons if needed
-├── .env.example            # ANTHROPIC_API_KEY=your_key_here
+├── index.html
+├── vercel.json
+├── requirements.txt                 # Vercel Python runtime dependencies
+├── README.md
 ├── TECH_SPEC.md
-├── CURSOR_RULES.md
-└── README.md
+├── api/
+│   ├── summarise.py                 # Serverless summary endpoint
+│   └── log.py                       # Serverless usage log endpoint (/tmp)
+├── backend/
+│   ├── app.py                       # Flask local API (/api/summarise, /api/log, /api/crime-data)
+│   ├── scraper.py
+│   ├── requirements.txt
+│   └── data/
+│       ├── usage-log.json
+│       ├── qps_raw.csv
+│       └── DATA_SOURCES.md
+├── css/
+│   ├── tokens.css
+│   ├── reset.css
+│   ├── base.css
+│   ├── layout.css
+│   ├── sidebar.css
+│   ├── map.css
+│   └── panels.css
+├── js/
+│   ├── main.js
+│   ├── map.js
+│   ├── api.js
+│   ├── data.js
+│   └── llm.js
+└── data/
+    └── crime-cache.json
 ```
 
 ---
 
-## 4. CSS architecture
+## 4. Frontend module responsibilities
 
-All CSS is imported in order via link tags in index.html. No CSS-in-JS, no scoped styles.
+### `js/main.js`
+- Binds UI events (`Analyse route`, swap, destination search).
+- Coordinates geocoding, routing, risk computation, parking query, AI summary, and usage logging.
+- Updates stat cards, footer analytics, risk list, and summary panels.
 
-### 4.1 Design tokens (tokens.css)
+### `js/map.js`
+- Initializes Leaflet map.
+- Draws primary route + optional alternative route.
+- Manages endpoint markers, risk circles, and parking markers/popups.
 
-```css
-:root {
-  --paper:    #f7f4ef;
-  --paper-2:  #f0ebe2;
-  --paper-3:  #e8e1d5;
-  --ink:      #1c1a17;
-  --ink-2:    #5c564d;
-  --ink-3:    #9b9289;
-  --rule:     #d6cfc4;
-  --accent:   #c96a2b;
-  --danger:   #b84040;
-  --warn:     #c4812a;
-  --safe:     #4a7c5f;
-  --serif:    Georgia, 'Times New Roman', serif;
-  --sans:     system-ui, -apple-system, sans-serif;
-  --sidebar-w: 268px;
-  --topbar-h:  48px;
-  --panels-h:  196px;
-}
-```
+### `js/api.js`
+- Wraps browser-side HTTP calls:
+  - `geocodePostcode`, `reverseGeocode`, `searchPlace` (Nominatim)
+  - `fetchRoute` (OSRM)
+  - `fetchParkingNearRoute` (Overpass mirrors + `Promise.any`)
+- Returns normalized data and graceful `null` on failures.
 
-### 4.2 Layout grid (layout.css)
+### `js/data.js`
+- Contains demo suburb crime dataset.
+- Computes suburbs in route bounds and aggregate risk score.
+- Exposes `getPeakRiskPeriod` for sidebar footer details.
 
-```css
-.dashboard {
-  display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
-  grid-template-rows: var(--topbar-h) 1fr;
-  height: 100vh;
-  max-height: 900px;
-}
-```
-
-The dashboard never scrolls. All content fits in the viewport.
+### `js/llm.js`
+- Builds model prompt from route suburb data.
+- Calls summary endpoint with endpoint fallback strategy.
+- Streams text into summary panel and post-processes emphasis styling.
 
 ---
 
-## 5. JavaScript modules
+## 5. API contracts
 
-### main.js
-Imports all modules. Binds #analyse-btn click → orchestrates geocode → route → parking → crime → llm. Manages loading states.
-
-### map.js
-- Initialises Leaflet centred on Brisbane (-27.47, 153.02, zoom 12)
-- Tile: https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
-- Exports: drawRoute(A, B), addParkingMarkers(features), addRiskZones(zones), clearAll()
-
-### api.js
-- geocodePostcode(postcode) → Nominatim → {lat, lng, display_name}
-- fetchParkingNearRoute(bounds) → Overpass API → parking features
-- Both async, return null on failure
-
-### data.js
-- Loads crime-cache.json once on startup
-- getCrimeScore(suburb) → {score, incidents, rank}
-- getSuburbsAlongRoute(A, B) → suburb list from bbox check
-
-### llm.js
-- buildPrompt(origin, destination, zones) → string
-- fetchRiskSummary(prompt) → POST /api/summarise → streams into #ai-summary-text
-
-### router.js
-- Reads ?from=4000&to=4067 on load, pre-fills inputs
-- Updates URL on analyse via history.pushState
-
----
-
-## 6. Backend (Flask proxy)
-
-```
-backend/
-├── app.py           # POST /api/summarise → Anthropic API → stream
-├── scraper.py       # Fetches QPS CSV → outputs crime-cache.json
-└── requirements.txt # flask, anthropic, requests
-```
-
-Model: claude-haiku-4-5 (fast, cheap for short summaries ~$0.001 each).
-CORS restricted to localhost in dev.
-
----
-
-## 7. Data flow
-
-```
-User clicks "Analyse route"
-  ├─► geocodePostcode(origin + dest)   → Nominatim
-  ├─► drawRoute(A, B)                  → Leaflet polyline
-  ├─► getSuburbsAlongRoute(A, B)       → data.js
-  ├─► getCrimeScore(each suburb)       → data.js → risk zones
-  ├─► addRiskZones(zones)              → map.js
-  ├─► fetchParkingNearRoute(bbox)      → Overpass
-  ├─► addParkingMarkers(features)      → map.js
-  └─► buildPrompt + fetchRiskSummary   → Flask → Claude → streamed text
-```
-
----
-
-## 8. crime-cache.json schema
-
+### `POST /api/summarise`
+Request body:
 ```json
-{
-  "updated": "2025-04-01",
-  "source": "Queensland Police Service open data",
-  "suburbs": {
-    "Milton": {
-      "score": 78,
-      "incidents_per_100k": 142.3,
-      "rank": "high",
-      "peak_period": "Fri-Sat 20:00-02:00"
-    }
-  }
-}
+{ "prompt": "string" }
 ```
+
+Success:
+- `200 text/plain` (summary body)
+
+Failure:
+- `400 application/json` for invalid input
+- `429 application/json` for quota/rate-limit class errors
+- `500 application/json` for server/runtime errors
+
+### `GET /api/log`
+Returns:
+```json
+{ "total": 3, "entries": [ ... ] }
+```
+
+### `POST /api/log`
+Appends one entry and returns:
+```json
+{ "logged": true, "total": 4 }
+```
+
+Notes:
+- Vercel serverless log writes to `/tmp/usage-log.json` (ephemeral).
+- Flask local log writes to `backend/data/usage-log.json`.
 
 ---
 
-## 9. LLM prompt template
+## 6. Local development modes
 
-```
-You are a crime risk analyst for a vehicle theft awareness tool in Brisbane.
-The user is driving from {origin} to {destination}.
-Route suburbs and risk profiles: {zones_list}
+### Mode A: Flask + static server (simple)
+1. Start Flask on `:5000` from `backend/`.
+2. Start static frontend on `:8080` from project root.
+3. Frontend will use `/api/*` when available, otherwise fallback to Flask endpoints.
 
-Write 2-3 sentences of plain-language summary. Include:
-- Overall route risk level
-- Highest-risk area and brief reason
-- One practical recommendation
-
-No bullet points. Calm, factual prose.
-```
+### Mode B: `vercel dev` (production-like)
+1. Run `vercel dev` at project root.
+2. Vercel serves static assets and Python handlers together under one origin.
 
 ---
 
-## 10. External API limits
+## 7. Deployment notes (Vercel)
 
-| API | Rate limit | Key | Cost |
-|---|---|---|---|
-| Nominatim | 1 req/sec | No | Free |
-| Overpass | Fair use | No | Free |
-| OSM tiles | Fair use | No | Free |
-| Anthropic | Per token | Backend only | ~$0.001/summary |
-| QPS open data | None | No | Free |
+- `vercel.json` controls routing to static assets and `api/*.py`.
+- Set environment variable:
+  - `GEMINI_API_KEY` (required), optional `GEMINI_MODEL`.
+- If route analysis fails on deployed HTTPS pages, verify OSRM requests use `https://` (mixed-content safe).
 
 ---
 
-## 11. Out of scope (demo)
+## 8. Known limitations
 
-- No user accounts
-- No mobile layout (desktop-only)
-- No turn-by-turn routing (straight polyline for demo)
-- No real-time crime events (weekly cache)
+- Crime data is currently suburb-level demo data, not real-time events.
+- Overpass and OSRM are public free services and may rate-limit or timeout.
+- Serverless usage logs are ephemeral in production (`/tmp` storage lifecycle).

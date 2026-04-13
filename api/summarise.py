@@ -17,6 +17,7 @@ class handler(BaseHTTPRequestHandler):
         return
 
     def do_OPTIONS(self):
+        # Allow browser clients to call this endpoint from any origin.
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -24,6 +25,7 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        # Parse request body and validate prompt input.
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length) if length else b"{}"
         try:
@@ -51,6 +53,7 @@ class handler(BaseHTTPRequestHandler):
         model_name = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 
         try:
+            # Non-streaming response keeps the handler simple for serverless runtime.
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(model_name)
             result = model.generate_content(
