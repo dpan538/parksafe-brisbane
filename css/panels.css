@@ -1,0 +1,134 @@
+.panels {
+    background: var(--paper);
+    border-top: var(--border-ink);
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr 260px;
+    height: var(--panels-h);
+    overflow: hidden;
+  }
+  
+  .panel {
+    padding: var(--sp-4) var(--sp-4);
+    border-right: var(--border-rule);
+    overflow: hidden;
+  }
+  
+  .panel:last-child { border-right: none; }
+  
+  .panel__head {
+    font-size: 13px;
+    font-family: var(--sans);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: var(--sp-2);
+    padding-bottom: var(--sp-2);
+    border-bottom: var(--border-rule);
+  }
+  
+  .panel__body {
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+  
+  .panel__body strong { color: var(--ink); font-weight: 600; }
+
+  /* AI summary: emphasise auto-detected keywords a bit heavier */
+  #ai-summary strong {
+    color: var(--ink);
+    font-weight: 700;
+  }
+  
+  .panel__placeholder {
+    font-family: var(--sans);
+    font-size: 16px;
+    color: var(--ink-3);
+    line-height: 1.6;
+  }
+  
+  /* Zone list */
+  .zone-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: var(--border-rule);
+    font-size: 17px;
+  }
+  
+  .zone-row:last-child { border-bottom: none; }
+  
+  .zone-name {
+    font-family: var(--serif);
+    color: var(--ink);
+    font-weight: 400;
+  }
+  
+  .zone-badge {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 1px;
+  }
+  
+  .zone-badge--high   { background: #f5e0e0; color: var(--danger); }
+  .zone-badge--medium { background: #f5ecda; color: var(--warn); }
+  .zone-badge--low    { background: #ddf0e6; color: var(--safe); }
+  
+  /* Risk index */
+  .risk-num {
+    font-family: var(--serif);
+    font-size: 62px;
+    font-weight: 400;
+    color: var(--accent);
+    line-height: 1;
+    margin-top: 2px;
+  }
+  
+  .risk-bar-wrap {
+    height: 3px;
+    background: var(--paper-3);
+    border-radius: 2px;
+    margin: var(--sp-2) 0 var(--sp-1);
+    overflow: hidden;
+  }
+  
+  .risk-bar {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--danger);
+    width: 0%;
+    transition: width 600ms ease;
+  }
+  
+  .risk-sub {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  
+  .risk-empty {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  #zone-list {
+    overflow-y: auto;
+    max-height: 140px;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE / legacy Edge */
+  }
+
+  #zone-list::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Chromium Edge */
+  }
