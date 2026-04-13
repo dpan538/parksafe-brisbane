@@ -105,7 +105,7 @@ out body;`;
 export async function fetchRoute(latLngA, latLngB) {
   try {
     const url =
-      `http://router.project-osrm.org/route/v1/driving/` +
+      `https://router.project-osrm.org/route/v1/driving/` +
       `${latLngA.lng},${latLngA.lat};${latLngB.lng},${latLngB.lat}` +
       `?overview=full&geometries=geojson&alternatives=true`;
     const res = await fetch(url);
