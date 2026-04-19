@@ -1,0 +1,74 @@
+{
+  "reviews": {
+    "default": {
+      "name": "Street Parking",
+      "ratings": [
+        3,
+        4,
+        3,
+        4
+      ],
+      "comments": [
+        {
+          "park_key": "default",
+          "rating": 4,
+          "comment": "not a bad choice",
+          "time_of_day": "Afternoon",
+          "date": "Apr 2026",
+          "session_origin": "4007",
+          "session_dest": "4068",
+          "text": "not a bad choice",
+          "time": "Afternoon"
+        },
+        {
+          "text": "Fine during the day but poorly lit at night.",
+          "time": "Night",
+          "date": "Apr 2026"
+        },
+        {
+          "text": "Usually spaces available on weekdays.",
+          "time": "Morning",
+          "date": "Mar 2026"
+        }
+      ]
+    },
+    "monitored": {
+      "name": "Monitored Car Park",
+      "ratings": [
+        4,
+        5,
+        4,
+        3,
+        4
+      ],
+      "comments": [
+        {
+          "park_key": "monitored",
+          "rating": 4,
+          "comment": "good spot",
+          "time_of_day": "Afternoon",
+          "date": "Apr 2026",
+          "session_origin": "4007",
+          "session_dest": "4000",
+          "text": "good spot",
+          "time": "Afternoon"
+        },
+        {
+          "text": "CCTV visible, felt safe leaving the car here.",
+          "time": "Evening",
+          "date": "Apr 2026"
+        },
+        {
+          "text": "A bit expensive but secure.",
+          "time": "Afternoon",
+          "date": "Apr 2026"
+        },
+        {
+          "text": "Good option near the city on weekends.",
+          "time": "Weekend",
+          "date": "Mar 2026"
+        }
+      ]
+    }
+  }
+}

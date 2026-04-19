@@ -33,7 +33,7 @@ SOURCE_PAGE = (
 BACKEND_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BACKEND_DIR.parent
 OUT_PATH = ROOT_DIR / "data" / "crime-cache.json"
-FALLBACK_CSV = BACKEND_DIR / "data" / "qps_raw.csv"
+FALLBACK_CSV = ROOT_DIR / "data" / "qps_raw.csv"
 
 # QPS division names for inner areas that do not contain the substring
 # "Brisbane" but sit within Greater Brisbane / City of Brisbane policing.
@@ -127,7 +127,7 @@ def fetch_or_load_csv() -> str:
             print(f"  Reading {FALLBACK_CSV}")
             return FALLBACK_CSV.read_text(encoding="utf-8", errors="replace")
         raise SystemExit(
-            "No CSV available (download failed and backend/data/qps_raw.csv missing or empty)."
+            "No CSV available (download failed and data/qps_raw.csv missing or empty)."
         ) from e
 
 

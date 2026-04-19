@@ -43,11 +43,20 @@
 - Used for: generating plain-language risk summaries
 - Key stored in backend/.env (never committed to repository)
 
-## Usage Logging (local only)
+## Project data directory (repo root `data/`)
 
-**data/usage-log.json**
+All runtime JSON and optional scraper inputs live under **`data/`** at the project root (not under `backend/data/`).
+
+**`data/usage-log.json`**
 - Local file, never transmitted externally
-- Records: timestamp, origin postcode, destination postcode,
-  route risk score, suburb count
+- Records per analyse session (see backend `app.py` whitelist)
 - Purpose: studio testing session analysis (DECO7180)
-- Retention: session only, cleared manually between sessions
+
+**`data/parking-reviews.json`**
+- Demo template buckets + user-submitted reviews via `POST /api/review`
+
+**`data/crime-cache.json`**
+- Written by `backend/scraper.py` from QPS open data
+
+**`data/qps_raw.csv`** (optional)
+- Offline fallback CSV for the scraper when the S3 download fails

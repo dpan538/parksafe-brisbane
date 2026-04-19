@@ -137,6 +137,69 @@
                     </button>
                 </div>
 
+                <div
+                    id="route-confirm"
+                    style="
+                        display: none;
+                        padding: 14px 16px;
+                        background: var(--paper-3);
+                        border-top: var(--border-rule);
+                        border-bottom: var(--border-rule);
+                    ">
+                    <div
+                        id="confirm-text"
+                        style="
+                            font-family: var(--sans);
+                            font-size: 12px;
+                            color: var(--ink-2);
+                            line-height: 1.6;
+                            margin-bottom: 10px;
+                        ">
+                        Route includes medium-risk areas.
+                    </div>
+                    <button
+                        id="confirm-proceed"
+                        type="button"
+                        style="
+                            display: block;
+                            width: 100%;
+                            background: var(--ink);
+                            color: var(--paper);
+                            border: none;
+                            border-radius: var(--r);
+                            padding: 9px 0;
+                            font-family: var(--sans);
+                            font-size: 11px;
+                            font-weight: 700;
+                            letter-spacing: 0.1em;
+                            text-transform: uppercase;
+                            cursor: pointer;
+                            margin-bottom: 6px;
+                        ">
+                        Proceed with this route
+                    </button>
+                    <button
+                        id="confirm-alt"
+                        type="button"
+                        style="
+                            display: block;
+                            width: 100%;
+                            background: transparent;
+                            color: var(--ink-2);
+                            border: var(--border-rule);
+                            border-radius: var(--r);
+                            padding: 9px 0;
+                            font-family: var(--sans);
+                            font-size: 11px;
+                            font-weight: 700;
+                            letter-spacing: 0.1em;
+                            text-transform: uppercase;
+                            cursor: pointer;
+                        ">
+                        View safer alternative
+                    </button>
+                </div>
+
                 <!-- Stats -->
                 <div class="stat-grid">
                     <div class="stat-cell">
@@ -362,7 +425,67 @@
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
         <!-- App modules -->
-        <script type="module" src="js/main.js"></script>
+        <script type="module" src="js/main.js?v=parking-review-1"></script>
+
+        <div
+            id="park-overlay"
+            style="
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(28, 26, 23, 0.18);
+                z-index: 600;
+                pointer-events: auto;
+            "></div>
+
+        <div
+            id="park-popup"
+            style="
+                display: none;
+                position: fixed;
+                z-index: 700;
+                width: 280px;
+                pointer-events: auto;
+            ">
+            <div class="park-popup__inner">
+                <div class="park-popup__header">
+                    <div>
+                        <div class="park-popup__name" id="popup-name">
+                            Car park
+                        </div>
+                        <div class="park-popup__meta" id="popup-meta">
+                            OpenStreetMap
+                        </div>
+                    </div>
+                    <button class="park-popup__close" id="popup-close" type="button">
+                        ×
+                    </button>
+                </div>
+
+                <div class="park-popup__rating-row">
+                    <div class="park-popup__stars" id="popup-stars"></div>
+                    <div class="park-popup__avg" id="popup-avg"></div>
+                </div>
+
+                <div class="park-popup__comments" id="popup-comments"></div>
+
+                <div class="park-popup__divider"></div>
+
+                <div class="park-popup__write">
+                    <div class="park-popup__write-label">Leave a note</div>
+                    <div class="park-popup__star-input" id="star-input"></div>
+                    <textarea
+                        id="popup-textarea"
+                        class="park-popup__textarea"
+                        placeholder="What was it like parking here?"
+                        maxlength="160"
+                        rows="2"></textarea>
+                    <button class="park-popup__submit" id="popup-submit" type="button">
+                        Submit
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <script>
             (function () {

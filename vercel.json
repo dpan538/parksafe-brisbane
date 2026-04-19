@@ -2,6 +2,9 @@
   "version": 2,
   "routes": [
     { "src": "/api/summarise", "dest": "/api/summarise.py" },
+    { "src": "/api/review", "dest": "/api/log.py" },
+    { "src": "/api/reviews", "dest": "/api/log.py" },
+    { "src": "/api/log/update", "dest": "/api/log.py" },
     { "src": "/api/log", "dest": "/api/log.py" },
     { "src": "/css/(.*)", "dest": "/css/$1" },
     { "src": "/js/(.*)", "dest": "/js/$1" },

@@ -182,3 +182,62 @@
     height: 1px;
     background: var(--rule);
   }
+
+  .route-confirm {
+    border-top: var(--border-rule);
+    border-bottom: var(--border-rule);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--paper-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .route-confirm__text {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--ink-2);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    word-wrap: break-word;
+  }
+
+  .route-confirm__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-width: 0;
+  }
+
+  .route-confirm__btn {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    border-radius: var(--r);
+    padding: 8px 0;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity 120ms;
+  }
+
+  .route-confirm__btn--proceed {
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+  }
+
+  .route-confirm__btn--alt {
+    background: transparent;
+    color: var(--ink-2);
+    border: var(--border-rule);
+  }
+
+  .route-confirm__btn:hover {
+    opacity: 0.82;
+  }

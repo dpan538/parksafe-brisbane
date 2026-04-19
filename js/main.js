@@ -7,7 +7,8 @@ import {
     addRiskZones,
     addParkingMarkers,
     clearAll,
-} from "./map.js";
+    loadParkingReviews,
+} from "./map.js?v=parking-review-1";
 import {
     geocodePostcode,
     fetchRoute,
@@ -22,16 +23,15 @@ import {
     calcRouteRisk,
     getPeakRiskPeriod,
 } from "./data.js";
-import { fetchRiskSummary } from "./llm.js";
+import { fetchRiskSummary } from "./llm.js?v=parksafe-1";
 
-// Use Vercel-style relative API first. In plain local static mode, fallback to Flask.
-const LOG_ENDPOINTS = ["/api/log"];
-if (typeof window !== "undefined" && window.location.protocol === "http:") {
-    LOG_ENDPOINTS.push("http://127.0.0.1:5000/api/log");
-}
+const API_BASE = "http://127.0.0.1:5000";
 
-// Boot
-const map = initMap();
+// Boot: load demo parking reviews, then init map (markers use review data on click).
+(async () => {
+    await loadParkingReviews();
+    initMap();
+})();
 
 function showStatus(msg) {
     const bar = document.getElementById("status-bar");
@@ -104,6 +104,7 @@ document.getElementById("search-input").addEventListener(
             input.value = dest.display_name;
             input.disabled = false;
 
+            window._inputMethod = "search_gps";
             document.getElementById("analyse-btn").click();
         } catch (err) {
             const dest = await searchPlace(savedQuery);
@@ -129,6 +130,10 @@ document.getElementById("search-input").addEventListener(
 
 // Main analyse flow
 document.getElementById("analyse-btn").addEventListener("click", async () => {
+    const sessionStart = Date.now();
+    const inputMethodForLog = window._inputMethod || "manual";
+    window._inputMethod = "manual";
+
     const originVal = document.getElementById("input-origin").value.trim();
     const destVal = document.getElementById("input-dest").value.trim();
 
@@ -141,6 +146,11 @@ document.getElementById("analyse-btn").addEventListener("click", async () => {
         showStatus("Please enter valid 4-digit Australian postcodes.");
         return;
     }
+
+    window._currentSessionId = crypto.randomUUID();
+    window._sessionLogPosted = false;
+    window._pendingParkingClick = false;
+    window._clickedParkingLogged = false;
 
     setLoading(true);
     clearAll();
@@ -162,6 +172,9 @@ document.getElementById("analyse-btn").addEventListener("click", async () => {
         setLoading(false);
         return;
     }
+
+    window._currentOrigin = originVal;
+    window._currentDest = destVal;
 
     const latLngA = { lat: origin.lat, lng: origin.lng };
     const latLngB = { lat: dest.lat, lng: dest.lng };
@@ -240,26 +253,143 @@ document.getElementById("analyse-btn").addEventListener("click", async () => {
         }
     }
 
-    // 9. Stream AI summary
-    showStatus("Generating AI summary…");
-    const summaryEl = document.getElementById("ai-summary");
-    await fetchRiskSummary(origin.suburb, dest.suburb, suburbs, summaryEl);
+    if (risk.rank === "high" || risk.rank === "medium") {
+        showRouteConfirm(risk, suburbs);
+    } else {
+        const rc = document.getElementById("route-confirm");
+        if (rc) rc.style.display = "none";
+    }
 
-    // 10. Usage log (non-blocking)
-    postUsageLog({
+    const highRiskCount = suburbs.filter((s) => s.rank === "high").length;
+    const parkingFoundCount = parking === null ? 0 : parking.length;
+    const riskRatio =
+        suburbs.length > 0
+            ? parseFloat(
+                  (highRiskCount / suburbs.length).toFixed(2),
+              )
+            : 0;
+    const timeToAnalyseSec = parseFloat(
+        ((Date.now() - sessionStart) / 1000).toFixed(1),
+    );
+
+    const logPayload = {
+        session_id: window._currentSessionId,
+        timestamp: new Date().toISOString(),
+        weekday: new Date().toLocaleDateString("en-AU", { weekday: "long" }),
+        time_of_day: getTimeOfDay(),
+        is_weekend: [0, 6].includes(new Date().getDay()),
         origin: originVal,
         destination: destVal,
+        input_method: inputMethodForLog,
         risk_score: risk.score,
         risk_rank: risk.rank,
         suburb_count: suburbs.length,
-        parking_found: parking === null ? 0 : parking.length,
-    }).catch(() => {});
+        high_risk_count: highRiskCount,
+        risk_ratio: riskRatio,
+        parking_found: parkingFoundCount,
+        route_km: parseFloat(calcRouteDistance(routes[0])),
+        time_to_analyse_sec: timeToAnalyseSec,
+        proceeded: null,
+        used_alternative: false,
+        clicked_parking: false,
+    };
+    try {
+        const res = await postUsageLog(logPayload);
+        window._sessionLogPosted = true;
+        if (res.ok && window._pendingParkingClick) {
+            window._pendingParkingClick = false;
+            window._clickedParkingLogged = true;
+            updateLogSession({ clicked_parking: true });
+        }
+        if (!res.ok) window._pendingParkingClick = false;
+    } catch {
+        window._sessionLogPosted = true;
+        window._pendingParkingClick = false;
+    }
+
+    // 9. Stream AI summary (after usage row exists so parking clicks can PATCH)
+    showStatus("Generating AI summary…");
+    const summaryEl = document.getElementById("ai-summary");
+    await fetchRiskSummary(origin.suburb, dest.suburb, suburbs, summaryEl);
 
     hideStatus();
     setLoading(false);
 });
 
 // ── UI helpers ──────────────────────────────────────────
+
+function getTimeOfDay() {
+    const h = new Date().getHours();
+    if (h >= 6 && h < 12) return "Morning";
+    if (h >= 12 && h < 18) return "Afternoon";
+    if (h >= 18 && h < 22) return "Evening";
+    return "Night";
+}
+
+function showRouteConfirm(risk, suburbs) {
+    const card = document.getElementById("route-confirm");
+    const text = document.getElementById("confirm-text");
+    if (!card || !text) return;
+
+    const highCount = suburbs.filter((s) => s.rank === "high").length;
+
+    text.innerHTML =
+        risk.rank === "high"
+            ? `Route passes through <strong>${highCount} high-risk area${highCount > 1 ? "s" : ""}.</strong><br>Peak window: ${getPeakRiskPeriod(suburbs)}.`
+            : `Route includes some medium-risk areas.<br>A safer alternative is available.`;
+
+    card.style.display = "block";
+
+    document.getElementById("confirm-proceed").onclick = () => {
+        card.style.display = "none";
+        window._proceeded = true;
+        updateLogSession({ proceeded: true, used_alternative: false });
+    };
+
+    document.getElementById("confirm-alt").onclick = () => {
+        card.style.display = "none";
+        window._proceeded = false;
+        updateLogSession({ proceeded: false, used_alternative: true });
+        highlightAltRoute();
+    };
+}
+
+function updateLogSession(partial) {
+    const sid = window._currentSessionId;
+    if (!sid) return;
+    fetch(API_BASE + "/api/log/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sid, ...partial }),
+    }).catch(() => {});
+}
+
+function markParkingClickedForSession() {
+    const sid = window._currentSessionId;
+    if (!sid || window._clickedParkingLogged) return;
+    if (window._sessionLogPosted) {
+        window._clickedParkingLogged = true;
+        updateLogSession({ clicked_parking: true });
+    } else {
+        window._pendingParkingClick = true;
+    }
+}
+
+window._parksafeMarkParkingClick = markParkingClickedForSession;
+
+function highlightAltRoute() {
+    const paths = document.querySelectorAll(
+        "#map .leaflet-overlay-pane svg path.leaflet-interactive",
+    );
+    const altLine = paths[0];
+    if (!altLine) return;
+    const prev = altLine.getAttribute("stroke-width");
+    altLine.setAttribute("stroke-width", "4");
+    setTimeout(() => {
+        if (prev != null && prev !== "") altLine.setAttribute("stroke-width", prev);
+        else altLine.removeAttribute("stroke-width");
+    }, 2000);
+}
 
 // Approximate route distance in km from array of [lat,lng] points
 function calcRouteDistance(points) {
@@ -285,23 +415,12 @@ function setLoading(on) {
 }
 
 // Try each configured log endpoint until one accepts the POST.
-async function postUsageLog(payload) {
-    let lastErr = null;
-    for (const endpoint of LOG_ENDPOINTS) {
-        try {
-            const res = await fetch(endpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-            // Skip local static 404 and try Flask fallback.
-            if (res.status === 404 && endpoint.startsWith("/api/")) continue;
-            return;
-        } catch (err) {
-            lastErr = err;
-        }
-    }
-    if (lastErr) throw lastErr;
+function postUsageLog(payload) {
+    return fetch(API_BASE + "/api/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
 }
 
 function resetUI() {
@@ -325,6 +444,8 @@ function resetUI() {
     document.getElementById("ai-summary").innerHTML =
         '<span class="panel__placeholder">Analysing route…</span>';
     document.getElementById("footer-stats").style.display = "none";
+    const routeConfirm = document.getElementById("route-confirm");
+    if (routeConfirm) routeConfirm.style.display = "none";
 }
 
 function updateStats(risk, suburbs, parkingOrNull) {

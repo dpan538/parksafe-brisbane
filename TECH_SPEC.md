@@ -40,17 +40,14 @@ parksafe/
 ├── requirements.txt                 # Vercel Python runtime dependencies
 ├── README.md
 ├── TECH_SPEC.md
+├── log_schema.py                    # Canonical usage-log row shape (Flask + api/log.py)
 ├── api/
 │   ├── summarise.py                 # Serverless summary endpoint
 │   └── log.py                       # Serverless usage log endpoint (/tmp)
 ├── backend/
 │   ├── app.py                       # Flask local API (/api/summarise, /api/log, /api/crime-data)
 │   ├── scraper.py
-│   ├── requirements.txt
-│   └── data/
-│       ├── usage-log.json
-│       ├── qps_raw.csv
-│       └── DATA_SOURCES.md
+│   └── requirements.txt
 ├── css/
 │   ├── tokens.css
 │   ├── reset.css
@@ -65,8 +62,13 @@ parksafe/
 │   ├── api.js
 │   ├── data.js
 │   └── llm.js
-└── data/
-    └── crime-cache.json
+└── data/                            # Single project data dir (JSON + optional CSV)
+    ├── crime-cache.json
+    ├── usage-log.json
+    ├── parking-reviews.json
+    ├── postcodes.json
+    ├── qps_raw.csv                  # optional scraper fallback
+    └── DATA_SOURCES.md
 ```
 
 ---
@@ -132,7 +134,7 @@ Appends one entry and returns:
 
 Notes:
 - Vercel serverless log writes to `/tmp/usage-log.json` (ephemeral).
-- Flask local log writes to `backend/data/usage-log.json`.
+- Flask local log writes to `data/usage-log.json` (repo root `data/`).
 
 ---
 

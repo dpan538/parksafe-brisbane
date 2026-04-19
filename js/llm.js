@@ -1,10 +1,5 @@
 // llm.js — builds prompt and reads Gemini summary via server endpoint.
-// Primary path is /api/summarise (Vercel production or `vercel dev`).
-// For simple local static serving (python http.server), we fall back to Flask on :5000.
-const SUMMARISE_ENDPOINTS = ['/api/summarise'];
-if (typeof window !== 'undefined' && window.location.protocol === 'http:') {
-  SUMMARISE_ENDPOINTS.push('http://127.0.0.1:5000/api/summarise');
-}
+const BACKEND = 'http://127.0.0.1:5000/api/summarise';
 
 const QUOTA_HINT =
   'Risk summary unavailable: Gemini API quota or rate limit exceeded. ' +
@@ -130,37 +125,20 @@ export async function fetchRiskSummary(origin, dest, zones, targetEl) {
   targetEl.textContent = 'Generating risk summary…';
 
   try {
-    // Try serverless endpoint first, then local Flask fallback in http dev.
-    let res = null;
-    let lastErr = null;
-    let usedEndpoint = '';
-    for (const endpoint of SUMMARISE_ENDPOINTS) {
-      try {
-        console.log('[llm] POST summarise', endpoint, {
-          promptLength: prompt.length,
-          promptPreview: prompt.slice(0, 120) + (prompt.length > 120 ? '…' : ''),
-        });
-        const candidate = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt }),
-        });
-        // Typical local static server returns 404 for /api/*; try fallback next.
-        if (candidate.status === 404 && endpoint.startsWith('/api/')) {
-          continue;
-        }
-        res = candidate;
-        usedEndpoint = endpoint;
-        break;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    if (!res) throw lastErr || new Error('No summary endpoint available');
+    console.log('[llm] POST summarise', BACKEND, {
+      promptLength: prompt.length,
+      promptPreview: prompt.slice(0, 120) + (prompt.length > 120 ? '…' : ''),
+    });
+
+    const res = await fetch('http://127.0.0.1:5000/api/summarise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
 
     console.log(
       '[llm] Summarise response:',
-      usedEndpoint,
+      BACKEND,
       res.status,
       res.statusText,
       'ok=',
